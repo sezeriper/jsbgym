@@ -352,13 +352,15 @@ class FlightGearVisualiser(object):
         cmd_line_args = FlightGearVisualiser._create_cmd_line_args(
             aircraft.flightgear_id
         )
-        gym.logger.info(f'Subprocess: "{cmd_line_args}"')
+        # gym.logger.info(f'Subprocess: "{cmd_line_args}"')
+        print(f'Subprocess: "{cmd_line_args}"')
         flightgear_process = subprocess.Popen(
             cmd_line_args,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        gym.logger.info("Started FlightGear")
+        # gym.logger.info("Started FlightGear")
+        print("Started FlightGear")
         return flightgear_process
 
     def configure_simulation_output(self, sim: Simulation):

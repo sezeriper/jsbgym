@@ -20,7 +20,7 @@ class Simulation(object):
 
     def __init__(
         self,
-        sim_frequency_hz: float = 60.0,
+        sim_frequency_hz: float = 150.0,
         aircraft: Aircraft = c172,
         init_conditions: Dict[prp.Property, float] = None,
         allow_flightgear_output: bool = True,

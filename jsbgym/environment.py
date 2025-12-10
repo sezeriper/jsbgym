@@ -22,10 +22,10 @@ class JsbSimEnv(gym.Env):
     docstrings have been adapted or copied from the OpenAI Gym source code then migrated to work with the gymnasium interface.
     """
 
-    JSBSIM_DT_HZ: int = 60  # JSBSim integration frequency
+    JSBSIM_DT_HZ: int = 150  # JSBSim integration frequency
     metadata = {
         "render_modes": ["human", "flightgear", "human_fg", "graph", "graph_fg"],
-        "render_fps": 60,
+        "render_fps": 150,
     }
 
     def __init__(
@@ -227,10 +227,10 @@ class NoFGJsbSimEnv(JsbSimEnv):
     failure of the network.
     """
 
-    JSBSIM_DT_HZ: int = 60  # JSBSim integration frequency
+    JSBSIM_DT_HZ: int = 150  # JSBSim integration frequency
     metadata = {
         "render_modes": ["human", "graph"],
-        "render_fps": 60,
+        "render_fps": 150,
     }
 
     def _init_new_sim(self, dt: float, aircraft: Aircraft, initial_conditions: Dict):

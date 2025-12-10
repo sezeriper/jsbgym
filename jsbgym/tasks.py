@@ -253,7 +253,7 @@ class HeadingControlTask(FlightTask):
 
     THROTTLE_CMD = 0.8
     MIXTURE_CMD = 0.8
-    INITIAL_HEADING_DEG = 270
+    INITIAL_HEADING_DEG = 0
     DEFAULT_EPISODE_TIME_S = 60.0
     ALTITUDE_SCALING_FT = 150
     TRACK_ERROR_SCALING_DEG = 8
@@ -261,6 +261,7 @@ class HeadingControlTask(FlightTask):
     SIDESLIP_ERROR_SCALING_DEG = 3.0
     MIN_STATE_QUALITY = 0.0  # terminate if state 'quality' is less than this
     MAX_ALTITUDE_DEVIATION_FT = 1000  # terminate if altitude error exceeds this
+    RATE_ERROR_SCALING_RADPS = 0.2  # approx 11.5 deg/s
     target_track_deg = BoundedProperty(
         "target/track-deg",
         "desired heading [deg]",
@@ -336,36 +337,81 @@ class HeadingControlTask(FlightTask):
         )
         return base_components
 
+    def _make_stability_components(self) -> Tuple[rewards.RewardComponent, ...]:
+        return (
+            rewards.AsymptoticErrorComponent(
+                name="roll_rate",
+                prop=prp.p_radps,
+                state_variables=self.state_variables,
+                target=0.0,
+                is_potential_based=True,
+                scaling_factor=self.RATE_ERROR_SCALING_RADPS,
+            ),
+            rewards.AsymptoticErrorComponent(
+                name="pitch_rate",
+                prop=prp.q_radps,
+                state_variables=self.state_variables,
+                target=0.0,
+                is_potential_based=True,
+                scaling_factor=self.RATE_ERROR_SCALING_RADPS,
+            ),
+            rewards.AsymptoticErrorComponent(
+                name="yaw_rate",
+                prop=prp.r_radps,
+                state_variables=self.state_variables,
+                target=0.0,
+                is_potential_based=True,
+                scaling_factor=self.RATE_ERROR_SCALING_RADPS,
+            ),
+        )
+
     def _select_assessor(
         self,
         base_components: Tuple[rewards.RewardComponent, ...],
         shaping_components: Tuple[rewards.RewardComponent, ...],
         shaping: Shaping,
     ) -> assessors.AssessorImpl:
+        # Define wings_level (uses roll_rad, which is in state)
+        wings_level = rewards.AsymptoticErrorComponent(
+            name="wings_level",
+            prop=prp.roll_rad,
+            state_variables=self.state_variables,
+            target=0.0,
+            is_potential_based=True,
+            scaling_factor=self.ROLL_ERROR_SCALING_RAD,
+        )
+
+        # Define level_pitch (uses pitch_rad, which is in state)
+        level_pitch = rewards.AsymptoticErrorComponent(
+            name="level_pitch",
+            prop=prp.pitch_rad,
+            state_variables=self.state_variables,
+            target=0.0,
+            is_potential_based=True,
+            scaling_factor=self.ROLL_ERROR_SCALING_RAD, # Use same scaling as roll for now
+        )
+
         if shaping is Shaping.STANDARD:
+            # Add stability penalties to standard shaping to encourage smooth flight
+            stability_components = self._make_stability_components()
             return assessors.AssessorImpl(
                 base_components,
-                shaping_components,
+                shaping_components + stability_components + (wings_level, level_pitch),
                 positive_rewards=self.positive_rewards,
             )
-        else:
-            wings_level = rewards.AsymptoticErrorComponent(
-                name="wings_level",
-                prop=prp.roll_rad,
-                state_variables=self.state_variables,
-                target=0.0,
-                is_potential_based=True,
-                scaling_factor=self.ROLL_ERROR_SCALING_RAD,
-            )
-            no_sideslip = rewards.AsymptoticErrorComponent(
-                name="no_sideslip",
-                prop=prp.sideslip_deg,
-                state_variables=self.state_variables,
-                target=0.0,
-                is_potential_based=True,
-                scaling_factor=self.SIDESLIP_ERROR_SCALING_DEG,
-            )
-            potential_based_components = (wings_level, no_sideslip)
+        
+        # Define no_sideslip (uses sideslip_deg, which MUST be in state if we reach here)
+        # Note: If sideslip_deg is NOT in state, using EXTRA shaping will crash. 
+        # But this preserves original behavior where it would crash only if EXTRA was used.
+        no_sideslip = rewards.AsymptoticErrorComponent(
+            name="no_sideslip",
+            prop=prp.sideslip_deg,
+            state_variables=self.state_variables,
+            target=0.0,
+            is_potential_based=True,
+            scaling_factor=self.SIDESLIP_ERROR_SCALING_DEG,
+        )
+        potential_based_components = (wings_level, no_sideslip)
 
         if shaping is Shaping.EXTRA:
             return assessors.AssessorImpl(
